@@ -468,6 +468,9 @@
   @keyframes scrollDot { 0% { top: -55%; } 60%, 100% { top: 105%; } }
 
   /* Hero — interactive node network that reaches toward the cursor (canvas, behind text) */
+  .cover { background:
+    radial-gradient(620px 620px at 6% 94%, rgba(255,81,37,0.11), transparent 62%),
+    var(--dark); }
   .cover-network { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
   .cover-eyebrow, .cover-title, .cover-tagline { position: relative; z-index: 2; }
   .cover-confidential, .cover-number, .cover-scrollcue { z-index: 2; }
@@ -1052,6 +1055,8 @@
           n.vx += (dxm / dm) * f; n.vy += (dym / dm) * f;
         }
       }
+      n.vx += (Math.random() - 0.5) * 0.012;            // perpetual slow wander -> alive with no cursor
+      n.vy += (Math.random() - 0.5) * 0.012;
       n.vx *= 0.99; n.vy *= 0.99;
       var sp = Math.sqrt(n.vx * n.vx + n.vy * n.vy), max = 2.2;
       if (sp > max) { n.vx = n.vx / sp * max; n.vy = n.vy / sp * max; }
