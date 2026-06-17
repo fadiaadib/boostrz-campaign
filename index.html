@@ -467,9 +467,8 @@
   .cover-scrollcue span { font-size: 9px; letter-spacing: 0.35em; text-transform: uppercase; color: var(--mid); }
   @keyframes scrollDot { 0% { top: -55%; } 60%, 100% { top: 105%; } }
 
-  /* Hero — coffee-stir experiment: espresso surface + cream swirl on the cursor */
-  .cover { background: radial-gradient(135% 105% at 50% 32%, #3A2419 0%, #281711 42%, #160C08 100%); }
-  .cover-swirl { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  /* Hero — interactive node network that reaches toward the cursor (canvas, behind text) */
+  .cover-network { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
   .cover-eyebrow, .cover-title, .cover-tagline { position: relative; z-index: 2; }
   .cover-confidential, .cover-number, .cover-scrollcue { z-index: 2; }
 
@@ -602,7 +601,7 @@
 
 <!-- COVER -->
 <section class="cover">
-  <canvas class="cover-swirl" aria-hidden="true"></canvas>
+  <canvas class="cover-network" aria-hidden="true"></canvas>
   <p class="cover-eyebrow">Campaign Bible — 2026</p>
   <h1 class="cover-title">Before<span class="dots"><i>.</i><i>.</i><i>.</i></span></h1>
   <div class="cover-tagline">
@@ -999,97 +998,102 @@
 </script>
 
 <script>
-// Hero swirl — cream stirred into coffee: the whole pool shares one rotating
-// vortex field (solid-body core, 1/r falloff) so the liquid swirls uniformly
+// Hero network — drifting nodes wired into a constellation; the ones near the
+// cursor lean toward it and throw links at it, like the web reaching to touch
 (function () {
   var cover = document.querySelector('.cover');
-  var canvas = document.querySelector('.cover-swirl');
+  var canvas = document.querySelector('.cover-network');
   if (!cover || !canvas) return;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   var ctx = canvas.getContext('2d');
   var dpr = Math.min(window.devicePixelRatio || 1, 2);
-  var w = 0, h = 0;
+  var w = 0, h = 0, nodes = [];
 
-  function resize() {
+  function build() {
     var r = cover.getBoundingClientRect();
     w = r.width; h = r.height;
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  resize();
-  addEventListener('resize', resize);
-
-  var particles = [];
-  var MAX = 320;
-  var mx = 0, my = 0;          // cursor (the spoon)
-  var cx = 0, cy = 0;          // stir centre, eased toward the cursor (inertia)
-  var omega = 0;              // ONE angular velocity shared by the whole pool
-  var seeded = false;
-
-  function emit(n) {
-    for (var i = 0; i < n; i++) {
-      if (particles.length >= MAX) break;
-      var ang = Math.random() * Math.PI * 2, rr = Math.random() * 11;
-      particles.push({
-        x: mx + Math.cos(ang) * rr,   // dropped at the spoon; the field carries it
-        y: my + Math.sin(ang) * rr,
-        life: 1,
-        decay: 0.0022 + Math.random() * 0.004,   // long-lived -> long tails
-        size: 7 + Math.random() * 16,
-        tone: Math.random()                       // cream .. caramel
+    var count = Math.max(50, Math.min(170, Math.round(w * h / 8500)));
+    nodes = [];
+    for (var i = 0; i < count; i++) {
+      nodes.push({
+        x: Math.random() * w, y: Math.random() * h,
+        vx: (Math.random() - 0.5) * 0.35, vy: (Math.random() - 0.5) * 0.35
       });
     }
   }
+  build();
+  addEventListener('resize', build);
 
+  var mx = -9999, my = -9999, active = false;
   cover.addEventListener('pointermove', function (e) {
     var r = cover.getBoundingClientRect();
-    var nx = e.clientX - r.left, ny = e.clientY - r.top;
-    if (!seeded) { cx = nx; cy = ny; seeded = true; }
-    var dvx = nx - mx, dvy = ny - my;
-    // torque the pool: the tangential part of the stroke about the centre adds spin
-    var rx = nx - cx, ry = ny - cy, r2 = rx * rx + ry * ry + 600;
-    omega += (rx * dvy - ry * dvx) / r2 * 0.7;
-    if (omega > 0.16) omega = 0.16; else if (omega < -0.16) omega = -0.16;
-    mx = nx; my = ny;
-    emit(3);
+    mx = e.clientX - r.left; my = e.clientY - r.top; active = true;
   });
+  cover.addEventListener('pointerleave', function () { active = false; mx = my = -9999; });
+
+  var LINK = 132;   // node-to-node wiring distance
+  var REACH = 210;  // how far a node will throw a link at the cursor
+  var PULL = 200;   // how far the cursor tugs nodes toward it
 
   function tick() {
-    if (seeded) { cx += (mx - cx) * 0.05; cy += (my - cy) * 0.05; }  // centre lags the spoon
-    omega *= 0.99;                                                   // keeps turning, slows naturally
+    ctx.clearRect(0, 0, w, h);
 
-    // fade the previous frame slowly -> long marbled tails over the coffee
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = 'rgba(0,0,0,0.022)';
-    ctx.fillRect(0, 0, w, h);
-
-    ctx.globalCompositeOperation = 'source-over';
-    var core = 80;
-    for (var i = particles.length - 1; i >= 0; i--) {
-      var p = particles[i];
-      var dx = p.x - cx, dy = p.y - cy;
-      var rd = Math.sqrt(dx * dx + dy * dy);
-      // solid-body rotation in the core, gentle 1/r outside -> one coherent, uniform swirl
-      var wv = omega * (rd <= core ? 1 : core / rd);
-      var c = Math.cos(wv), s = Math.sin(wv);
-      var ndx = dx * c - dy * s, ndy = dx * s + dy * c;
-      var pull = 0.998;                                              // faint inward draw of the vortex
-      p.x = cx + ndx * pull; p.y = cy + ndy * pull;
-      p.life -= p.decay;
-      if (p.life <= 0) { particles.splice(i, 1); continue; }
-      var a = p.life * 0.15;
-      var rad = p.size * (0.8 + (1 - p.life) * 0.7);                 // spreads as it dissolves
-      var R = (232 - p.tone * 44) | 0, G = (214 - p.tone * 74) | 0, B = (184 - p.tone * 96) | 0;
-      var g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
-      g.addColorStop(0, 'rgba(' + R + ',' + G + ',' + B + ',' + a + ')');
-      g.addColorStop(1, 'rgba(' + R + ',' + G + ',' + B + ',0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
-      ctx.fill();
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (active) {
+        var dxm = mx - n.x, dym = my - n.y, dm = Math.sqrt(dxm * dxm + dym * dym);
+        if (dm < PULL && dm > 0.01) {
+          var dir = dm > 24 ? 1 : -0.6;                 // gather toward it, but ring around (don't collapse)
+          var f = (1 - dm / PULL) * 0.05 * dir;
+          n.vx += (dxm / dm) * f; n.vy += (dym / dm) * f;
+        }
+      }
+      n.vx *= 0.99; n.vy *= 0.99;
+      var sp = Math.sqrt(n.vx * n.vx + n.vy * n.vy), max = 2.2;
+      if (sp > max) { n.vx = n.vx / sp * max; n.vy = n.vy / sp * max; }
+      n.x += n.vx; n.y += n.vy;
+      if (n.x < 0) { n.x = 0; n.vx = -n.vx; } else if (n.x > w) { n.x = w; n.vx = -n.vx; }
+      if (n.y < 0) { n.y = 0; n.vy = -n.vy; } else if (n.y > h) { n.y = h; n.vy = -n.vy; }
     }
+
+    // node-to-node links
+    ctx.lineWidth = 1;
+    for (var a = 0; a < nodes.length; a++) {
+      for (var b = a + 1; b < nodes.length; b++) {
+        var p = nodes[a], q = nodes[b];
+        var dx = p.x - q.x, dy = p.y - q.y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < LINK) {
+          ctx.strokeStyle = 'rgba(255,81,37,' + (1 - d / LINK) * 0.22 + ')';
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+        }
+      }
+    }
+
+    // links reaching for the cursor, brighter as they close in
+    if (active) {
+      ctx.lineWidth = 1.1;
+      for (var k = 0; k < nodes.length; k++) {
+        var nn = nodes[k];
+        var ex = mx - nn.x, ey = my - nn.y, de = Math.sqrt(ex * ex + ey * ey);
+        if (de < REACH) {
+          ctx.strokeStyle = 'rgba(255,122,72,' + (1 - de / REACH) * 0.55 + ')';
+          ctx.beginPath(); ctx.moveTo(nn.x, nn.y); ctx.lineTo(mx, my); ctx.stroke();
+        }
+      }
+      ctx.fillStyle = 'rgba(255,122,72,0.9)';
+      ctx.beginPath(); ctx.arc(mx, my, 2.6, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // the nodes
+    ctx.fillStyle = 'rgba(242,239,233,0.55)';
+    for (var m = 0; m < nodes.length; m++) {
+      ctx.beginPath(); ctx.arc(nodes[m].x, nodes[m].y, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
