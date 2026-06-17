@@ -467,6 +467,11 @@
   .cover-scrollcue span { font-size: 9px; letter-spacing: 0.35em; text-transform: uppercase; color: var(--mid); }
   @keyframes scrollDot { 0% { top: -55%; } 60%, 100% { top: 105%; } }
 
+  /* Hero — orange swirl that follows the cursor (canvas, behind the text) */
+  .cover-swirl { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .cover-eyebrow, .cover-title, .cover-tagline { position: relative; z-index: 2; }
+  .cover-confidential, .cover-number, .cover-scrollcue { z-index: 2; }
+
   /* The Reveal — every block rises into place on scroll (JS-gated via .reveal-on) */
   .reveal-on [data-rv] {
     opacity: 0; transform: translateY(26px);
@@ -593,6 +598,7 @@
 
 <!-- COVER -->
 <section class="cover">
+  <canvas class="cover-swirl" aria-hidden="true"></canvas>
   <p class="cover-eyebrow">Campaign Bible — 2026</p>
   <h1 class="cover-title">Before<span class="dots"><i>.</i><i>.</i><i>.</i></span></h1>
   <div class="cover-tagline">
@@ -985,6 +991,87 @@
     entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-live'); io2.unobserve(e.target); } });
   }, { threshold: 0.35 });
   document.querySelectorAll('.climax, .closing').forEach(function (s) { io2.observe(s); });
+})();
+</script>
+
+<script>
+// Hero swirl — orange embers that spiral off the cursor inside the cover
+(function () {
+  var cover = document.querySelector('.cover');
+  var canvas = document.querySelector('.cover-swirl');
+  if (!cover || !canvas) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  var ctx = canvas.getContext('2d');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var w = 0, h = 0;
+
+  function resize() {
+    var r = cover.getBoundingClientRect();
+    w = r.width; h = r.height;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  var particles = [];
+  var MAX = 180;
+  var mx = 0, my = 0;
+
+  function emit(n) {
+    for (var i = 0; i < n; i++) {
+      if (particles.length >= MAX) break;
+      var dir = Math.random() < 0.5 ? 1 : -1;            // swirl handedness
+      particles.push({
+        ox: mx, oy: my,                                  // spiral origin (drifts up like an ember)
+        angle: Math.random() * Math.PI * 2,
+        spin: dir * (0.08 + Math.random() * 0.11),       // angular speed
+        radius: 2 + Math.random() * 6,
+        grow: 0.6 + Math.random() * 1.3,                 // outward growth -> spiral
+        drift: -0.2 - Math.random() * 0.5,               // gentle rise
+        life: 1,
+        decay: 0.012 + Math.random() * 0.020,
+        size: 1 + Math.random() * 2.2,
+        hue: 14 + Math.random() * 18                     // orange band around #FF5125
+      });
+    }
+  }
+
+  cover.addEventListener('pointermove', function (e) {
+    var r = cover.getBoundingClientRect();
+    mx = e.clientX - r.left;
+    my = e.clientY - r.top;
+    emit(3);
+  });
+
+  function tick() {
+    ctx.clearRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'lighter';            // additive glow
+    for (var i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.angle += p.spin;
+      p.radius += p.grow;
+      p.oy += p.drift;
+      p.life -= p.decay;
+      if (p.life <= 0) { particles.splice(i, 1); continue; }
+      var x = p.ox + Math.cos(p.angle) * p.radius;
+      var y = p.oy + Math.sin(p.angle) * p.radius;
+      var rad = p.size * (0.6 + p.life) * 3;
+      var a = p.life * 0.32;
+      var g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, 'hsla(' + p.hue + ', 95%, 62%, ' + a + ')');
+      g.addColorStop(1, 'hsla(' + p.hue + ', 95%, 50%, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 })();
 </script>
 
