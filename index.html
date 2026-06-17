@@ -481,11 +481,14 @@
   .reveal-on [data-rv].is-visible { opacity: 1; transform: none; }
 
   /* The Film — the storyboard as a strip of film; frames that slowly breathe */
-  .filmstrip { position: relative; margin: 4rem 0 2rem; padding: 16px 0; }
+  .filmstrip { position: relative; margin: 4rem 0 2rem; padding: 22px 0; }
+  /* Film rails — a lighter film base with darker punched sprocket holes */
   .filmstrip::before, .filmstrip::after {
-    content: ''; position: absolute; left: 0; right: 0; height: 9px;
-    background-image: repeating-linear-gradient(90deg, #000 0 9px, transparent 9px 17px);
-    opacity: 0.6;
+    content: ''; position: absolute; left: 0; right: 0; height: 16px;
+    background-color: #1A1A1A;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='16'%3E%3Crect x='7' y='3.5' width='10' height='9' rx='2.5' fill='%23070707'/%3E%3C/svg%3E");
+    background-repeat: repeat-x; background-position: center;
+    border-top: 1px solid #060606; border-bottom: 1px solid #060606;
   }
   .filmstrip::before { top: 0; } .filmstrip::after { bottom: 0; }
   .filmstrip .storyboard { margin: 0; }
